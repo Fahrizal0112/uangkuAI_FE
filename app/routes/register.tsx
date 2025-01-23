@@ -22,42 +22,67 @@ export async function action({ request }: { request: Request }) {
   const password = formData.get("password");
   const confirmPassword = formData.get("confirmPassword");
 
+  // Validasi input
+  if (!username || !password || !confirmPassword) {
+    return json({ 
+      status: "error",
+      message: "Semua field harus diisi" 
+    }, { status: 400 });
+  }
+
   if (password !== confirmPassword) {
     return json({ 
       status: "error",
-      message: "Password and confirm password not match" 
+      message: "Password dan konfirmasi password tidak cocok" 
     }, { status: 400 });
   }
 
   try {
-    const response = await fetch("http://8.215.199.5/:3001/api/users/register", {
+    console.log('Attempting to register with:', { username }); // Logging untuk debug
+
+    const response = await fetch("http://8.215.199.5:3001/api/users/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Accept": "application/json"
       },
+      mode: 'cors',
       body: JSON.stringify({
         username,
         password,
       }),
     });
 
+    console.log('Response status:', response.status); // Logging untuk debug
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Server error response:', errorData);
+      return json({ 
+        status: "error",
+        message: "Registrasi gagal. Silakan coba lagi." 
+      }, { status: response.status });
+    }
+
     const data = await response.json();
+    console.log('Response data:', data); // Logging untuk debug
 
     if (data.status === "success") {
       return json({ 
         status: "success",
-        message: "Registration success! Please login." 
+        message: "Registrasi berhasil! Silakan login." 
       });
     } else {
       return json({ 
         status: "error",
-        message: "Registration failed. Please try again." 
+        message: data.message || "Registrasi gagal. Silakan coba lagi." 
       }, { status: 400 });
     }
   } catch (error) {
+    console.error('Registration error:', error);
     return json({ 
       status: "error",
-      message: "An error occurred. Please try again." 
+      message: "Terjadi kesalahan. Silakan coba lagi." 
     }, { status: 500 });
   }
 }
@@ -99,7 +124,7 @@ export default function Register() {
       setShowPopup(true);
       if (actionData.status === "success") {
         const timer = setTimeout(() => {
-          navigate("/login");
+          navigate("/");
         }, 2000);
         return () => clearTimeout(timer);
       }
