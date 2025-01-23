@@ -1,29 +1,42 @@
 import { Link } from "@remix-run/react";
-import { json, redirect } from "@remix-run/node";
-import { Form, useActionData } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { Form, useActionData, useNavigate } from "@remix-run/react";
+import { useState, useEffect } from "react";
+
+type ActionData = {
+  status: string;
+  message: string;
+  error?: string;
+};
+
+type PopupProps = {
+  message: string;
+  status: string;
+  isVisible: boolean;
+  onClose: () => void;
+};
 
 export async function action({ request }: { request: Request }) {
   const formData = await request.formData();
-  const email = formData.get("email");
+  const username = formData.get("username");
   const password = formData.get("password");
   const confirmPassword = formData.get("confirmPassword");
 
-  // Validasi dasar
   if (password !== confirmPassword) {
-    return json(
-      { error: "Password dan konfirmasi password tidak cocok" },
-      { status: 400 }
-    );
+    return json({ 
+      status: "error",
+      message: "Password and confirm password not match" 
+    }, { status: 400 });
   }
 
   try {
-    const response = await fetch("http://8.215.199.5:3001/api/users/register", {
+    const response = await fetch("http://8.215.199.5/:3001/api/users/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        email,
+        username,
         password,
       }),
     });
@@ -31,29 +44,73 @@ export async function action({ request }: { request: Request }) {
     const data = await response.json();
 
     if (data.status === "success") {
-      return redirect("/login");
+      return json({ 
+        status: "success",
+        message: "Registration success! Please login." 
+      });
     } else {
-      return json(
-        { error: "Gagal mendaftar. Silakan coba lagi." },
-        { status: 400 }
-      );
+      return json({ 
+        status: "error",
+        message: "Registration failed. Please try again." 
+      }, { status: 400 });
     }
   } catch (error) {
-    return json(
-      { error: "Terjadi kesalahan. Silakan coba lagi." },
-      { status: 500 }
-    );
+    return json({ 
+      status: "error",
+      message: "An error occurred. Please try again." 
+    }, { status: 500 });
   }
 }
 
+// Komponen Popup
+function Popup({ message, status, isVisible, onClose }: { message: string, status: string, isVisible: boolean, onClose: () => void }) {
+  return (
+    <div className={`fixed inset-0 flex items-center justify-center transition-opacity duration-300 ${
+      isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+    }`}>
+      <button className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose}></button>
+      <div className={`relative bg-white rounded-lg p-6 shadow-xl transform transition-all duration-300 ${
+        isVisible ? "scale-100" : "scale-95"
+      } ${status === "success" ? "border-l-4 border-green-500" : "border-l-4 border-red-500"}`}>
+        <div className="flex items-center space-x-3">
+          {status === "success" ? (
+            <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          ) : (
+            <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          )}
+          <p className="text-gray-800">{message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Register() {
-  const actionData = useActionData();
+  const actionData = useActionData<ActionData>();
+  const navigate = useNavigate();
+  const [showPopup, setShowPopup] = useState(false);
+
+  useEffect(() => {
+    if (actionData) {
+      setShowPopup(true);
+      if (actionData.status === "success") {
+        const timer = setTimeout(() => {
+          navigate("/login");
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [actionData, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       {/* Logo */}
       <div className="mb-8">
-        <img src="/logo.png" alt="Logo" className="w-20 h-20" />
+        <h1 className="text-5xl font-extrabold">UangKuAI</h1>
       </div>
 
       {/* Judul */}
@@ -62,22 +119,22 @@ export default function Register() {
       {/* Error Message */}
       {actionData?.error && (
         <div className="w-full max-w-md mb-4 p-4 text-red-700 bg-red-100 rounded-md">
-          {actionData.error}
+          (actionData.error)
         </div>
       )}
 
       {/* Form */}
       <div className="w-full max-w-md">
         <Form method="post" className="space-y-6">
-          {/* Email Input */}
+          {/* username Input */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-2">
-              Email
+            <label htmlFor="username" className="block text-sm font-medium mb-2">
+              username
             </label>
             <input
-              type="email"
-              id="email"
-              name="email"
+              type="username"
+              id="username"
+              name="username"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
@@ -130,13 +187,21 @@ export default function Register() {
         <div className="mt-6 text-center text-sm text-gray-600">
           Sudah punya akun?{" "}
           <Link
-            to="/login"
+            to="/"
             className="text-black font-semibold hover:underline"
           >
             Login sekarang
           </Link>
         </div>
       </div>
+
+      {/* Popup Notifikasi */}
+      <Popup
+        message={actionData?.message || "s"}
+        status={actionData?.status || ""}
+        isVisible={showPopup}
+        onClose={() => setShowPopup(false)}
+      />
     </div>
   );
 }
