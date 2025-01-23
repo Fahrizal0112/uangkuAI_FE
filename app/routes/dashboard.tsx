@@ -161,7 +161,8 @@ export default function Dashboard() {
         "Content-Type": "application/json",
         "Accept": "application/json"
       },
-      mode: 'cors' as RequestMode,
+      mode: 'cors',
+      credentials: 'same-origin',
       ...(body && { body: JSON.stringify(body) })
     };
   };
